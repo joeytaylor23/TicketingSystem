@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Ticketing System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="fas fa-sign-in-alt me-2"></i>Login</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
+                        <label for="username">Username</label>
+                        <div class="invalid-feedback">
+                            Please provide a valid username.
+                        </div>
+                    </div>
+                    
+                    <div class="form-floating mb-3">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
+                        <label for="password">Password</label>
+                        <div class="invalid-feedback">
+                            Please provide a password.
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </button>
+                    </div>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="mb-2">Don't have an account?</p>
+                    <a href="{{ url_for('register') }}" class="btn btn-outline-success">
+                        <i class="fas fa-user-plus me-2"></i>Register
+                    </a>
+                </div>
+                
+                <div class="mt-4 d-flex align-items-center justify-content-between">
+                    <small class="text-muted">
+                        <strong>Demo Accounts Available</strong>
+                    </small>
+                    <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#demoAccountsModal">
+                        <i class="fas fa-info-circle me-1"></i>Show Accounts
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Demo Accounts Modal -->
+<div class="modal fade" id="demoAccountsModal" tabindex="-1" aria-labelledby="demoAccountsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="demoAccountsModalLabel">
+                    <i class="fas fa-info-circle me-2 text-info"></i>Demo Account Credentials
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    <strong>Quick Start:</strong> Use these demo accounts to explore the system with different role permissions.
+                </div>
+                
+                <div class="row">
+                    <!-- Admin Account -->
+                    <div class="col-md-12 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-crown fa-lg text-danger me-2"></i>
+                                    <h6 class="mb-0 text-danger">Administrator</h6>
+                                    <span class="badge bg-danger ms-auto">Full Access</span>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <strong>Username:</strong>
+                                        <code class="user-select-all">admin</code>
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>Password:</strong>
+                                        <code class="user-select-all">admin123</code>
+                                    </div>
+                                </div>
+                                <small class="text-muted">• Manage users & system settings • View all tickets • Full permissions</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Technician Account -->
+                    <div class="col-md-12 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-tools fa-lg text-primary me-2"></i>
+                                    <h6 class="mb-0 text-primary">Technician</h6>
+                                    <span class="badge bg-primary ms-auto">Ticket Management</span>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <strong>Username:</strong>
+                                        <code class="user-select-all">technician</code>
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>Password:</strong>
+                                        <code class="user-select-all">tech123</code>
+                                    </div>
+                                </div>
+                                <small class="text-muted">• Assign & resolve tickets • Update status & priority • Manage workload</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Account -->
+                    <div class="col-md-12 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-user fa-lg text-success me-2"></i>
+                                    <h6 class="mb-0 text-success">User</h6>
+                                    <span class="badge bg-success ms-auto">Submit Tickets</span>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <strong>Username:</strong>
+                                        <code class="user-select-all">user</code>
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>Password:</strong>
+                                        <code class="user-select-all">user123</code>
+                                    </div>
+                                </div>
+                                <small class="text-muted">• Create support tickets • Track ticket progress • Add comments</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Note:</strong> These are demo credentials for testing purposes. In production, change all default passwords immediately!
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="fillLoginForm('admin', 'admin123')" data-bs-dismiss="modal">
+                    <i class="fas fa-sign-in-alt me-2"></i>Login as Admin
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fillLoginForm(username, password) {
+    document.getElementById('username').value = username;
+    document.getElementById('password').value = password;
+    // Optional: Auto-focus the login button
+    document.querySelector('button[type="submit"]').focus();
+}
+
+// Quick login buttons for each role
+function quickLogin(role) {
+    const credentials = {
+        'admin': { username: 'admin', password: 'admin123' },
+        'technician': { username: 'technician', password: 'tech123' },
+        'user': { username: 'user', password: 'user123' }
+    };
+    
+    if (credentials[role]) {
+        fillLoginForm(credentials[role].username, credentials[role].password);
+    }
+}
+
+// Add click event to copy credentials to clipboard
+document.addEventListener('DOMContentLoaded', function() {
+    const codeElements = document.querySelectorAll('code.user-select-all');
+    codeElements.forEach(function(element) {
+        element.style.cursor = 'pointer';
+        element.title = 'Click to copy';
+        
+        element.addEventListener('click', function() {
+            navigator.clipboard.writeText(this.textContent).then(function() {
+                // Show brief feedback
+                const original = element.textContent;
+                element.textContent = 'Copied!';
+                element.style.color = 'green';
+                
+                setTimeout(function() {
+                    element.textContent = original;
+                    element.style.color = '';
+                }, 1000);
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket #{{ ticket.id }} - {{ ticket.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-ticket-alt me-2"></i>Ticket #{{ ticket.id }}</h2>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    </a>
+</div>
+
+<div class="row">
+    <!-- Ticket Details -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ ticket.title }}</h5>
+                    <div>
+                        <span class="badge status-badge me-2" data-status="{{ ticket.status }}">
+                            {{ ticket.status.replace('_', ' ').title() }}
+                        </span>
+                        <span class="badge priority-{{ ticket.priority }}">
+                            {{ ticket.priority.title() }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">Description:</h6>
+                    <p class="mb-0">{{ ticket.description }}</p>
+                </div>
+                
+                <div class="row text-muted small">
+                    <div class="col-md-6">
+                        <strong>Created by:</strong> {{ ticket.creator.username }}<br>
+                        <strong>Created:</strong> {{ ticket.created_at.strftime('%Y-%m-%d %H:%M:%S') }}<br>
+                        <strong>Last updated:</strong> {{ ticket.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Category:</strong> 
+                        {% if ticket.category %}
+                            {{ ticket.category.name }}
+                        {% else %}
+                            <span class="text-muted">None</span>
+                        {% endif %}<br>
+                        <strong>Assigned to:</strong> 
+                        {% if ticket.assignee %}
+                            {{ ticket.assignee.username }}
+                        {% else %}
+                            <span class="text-muted">Unassigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add Comment Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-comment me-2"></i>Add Comment</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_comment', ticket_id=ticket.id) }}">
+                    <div class="form-floating mb-3">
+                        <textarea class="form-control" id="comment" name="comment" 
+                                  placeholder="Add your comment..." 
+                                  style="height: 100px" required maxlength="1000"></textarea>
+                        <label for="comment">Comment</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-2"></i>Add Comment
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Update Ticket (for technicians) -->
+        {% if current_user.is_technician() %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Update Ticket</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_ticket', ticket_id=ticket.id) }}">
+                    <div class="form-floating mb-3">
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="open" {% if ticket.status == 'open' %}selected{% endif %}>Open</option>
+                            <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                            <option value="resolved" {% if ticket.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                            <option value="closed" {% if ticket.status == 'closed' %}selected{% endif %}>Closed</option>
+                        </select>
+                        <label for="status">Status</label>
+                    </div>
+                    
+                    <div class="form-floating mb-3">
+                        <select class="form-select" id="priority" name="priority" required>
+                            <option value="low" {% if ticket.priority == 'low' %}selected{% endif %}>Low</option>
+                            <option value="medium" {% if ticket.priority == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="high" {% if ticket.priority == 'high' %}selected{% endif %}>High</option>
+                            <option value="urgent" {% if ticket.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+                        </select>
+                        <label for="priority">Priority</label>
+                    </div>
+                    
+                    <div class="form-floating mb-3">
+                        <select class="form-select" id="assigned_to_id" name="assigned_to_id">
+                            <option value="">Unassigned</option>
+                            {% for tech in technicians %}
+                            <option value="{{ tech.id }}" {% if ticket.assigned_to_id == tech.id %}selected{% endif %}>
+                                {{ tech.username }} ({{ tech.role.title() }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <label for="assigned_to_id">Assign to</label>
+                    </div>
+                    
+                    <div class="form-floating mb-3">
+                        <select class="form-select" id="category_id" name="category_id">
+                            <option value="">No Category</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if ticket.category_id == category.id %}selected{% endif %}>
+                                {{ category.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <label for="category_id">Category</label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-2"></i>Update Ticket
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Activity Log -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Activity Log</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="activity-log p-3">
+                    {% if activity_logs %}
+                        {% for log in activity_logs %}
+                        <div class="activity-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ log.action }}</strong>
+                                    <div class="small text-muted">{{ log.description }}</div>
+                                    <div class="activity-timestamp">
+                                        {{ log.user.username }} • {{ log.timestamp.strftime('%m/%d/%Y %H:%M') }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-clock fa-2x mb-2"></i>
+                            <p class="mb-0">No activity yet</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh activity log every 30 seconds
+    setInterval(function() {
+        if (!document.hidden) {
+            // Check for new activity (in a real app, this would be an AJAX call)
+            // For now, we'll just reload the page if needed
+        }
+    }, 30000);
+    
+    // Confirm status changes
+    const statusSelect = document.getElementById('status');
+    if (statusSelect) {
+        const originalStatus = statusSelect.value;
+        statusSelect.addEventListener('change', function() {
+            const newStatus = this.value;
+            
+            if (originalStatus === 'closed' && newStatus !== 'closed') {
+                if (!confirm('Are you sure you want to reopen this closed ticket?')) {
+                    this.value = originalStatus;
+                }
+            } else if (newStatus === 'closed' && originalStatus !== 'closed') {
+                if (!confirm('Are you sure you want to close this ticket? This action should only be done when the issue is completely resolved.')) {
+                    this.value = originalStatus;
+                }
+            }
+        });
+    }
+    
+    // Character counter for comment
+    const commentTextarea = document.getElementById('comment');
+    if (commentTextarea) {
+        const maxLength = commentTextarea.getAttribute('maxlength');
+        const counter = document.createElement('div');
+        counter.className = 'text-muted small text-end mt-1';
+        commentTextarea.parentNode.appendChild(counter);
+        
+        function updateCounter() {
+            const remaining = maxLength - commentTextarea.value.length;
+            counter.textContent = remaining + ' characters remaining';
+            
+            if (remaining < 50) {
+                counter.classList.add('text-warning');
+                counter.classList.remove('text-muted');
+            } else {
+                counter.classList.add('text-muted');
+                counter.classList.remove('text-warning');
+            }
+        }
+        
+        commentTextarea.addEventListener('input', updateCounter);
+        updateCounter();
+    }
+});
+</script>
+{% endblock %}

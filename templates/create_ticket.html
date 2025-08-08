@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Create Ticket - Ticketing System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-plus me-2"></i>Create New Ticket</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="title" name="title" placeholder="Ticket Title" required maxlength="200">
+                        <label for="title">Ticket Title</label>
+                        <div class="invalid-feedback">
+                            Please provide a descriptive title for your ticket.
+                        </div>
+                    </div>
+                    
+                    <div class="form-floating mb-3">
+                        <textarea class="form-control" id="description" name="description" 
+                                  placeholder="Describe your issue in detail..." 
+                                  style="height: 150px" required maxlength="2000"></textarea>
+                        <label for="description">Description</label>
+                        <div class="invalid-feedback">
+                            Please provide a detailed description of your issue.
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <select class="form-select" id="priority" name="priority" required>
+                                    <option value="">Select Priority</option>
+                                    <option value="low">Low - Minor issue, no rush</option>
+                                    <option value="medium" selected>Medium - Normal priority</option>
+                                    <option value="high">High - Important issue</option>
+                                    <option value="urgent">Urgent - Critical issue</option>
+                                </select>
+                                <label for="priority">Priority Level</label>
+                                <div class="invalid-feedback">
+                                    Please select a priority level.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <select class="form-select" id="category_id" name="category_id">
+                                    <option value="">Select Category (Optional)</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <label for="category_id">Category</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Tips for a good ticket:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Use a clear, descriptive title</li>
+                            <li>Include steps to reproduce the issue</li>
+                            <li>Mention any error messages you've seen</li>
+                            <li>Describe what you expected to happen vs. what actually happened</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-2"></i>Submit Ticket
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Priority level descriptions
+    const prioritySelect = document.getElementById('priority');
+    const priorityDescriptions = {
+        'low': 'Minor issues that don\'t affect daily work. Can be addressed when time permits.',
+        'medium': 'Standard issues that should be resolved in normal business hours.',
+        'high': 'Important issues that affect productivity and should be prioritized.',
+        'urgent': 'Critical issues that severely impact operations and need immediate attention.'
+    };
+    
+    prioritySelect.addEventListener('change', function() {
+        const selectedValue = this.value;
+        
+        // Remove any existing description
+        const existingDesc = document.querySelector('.priority-description');
+        if (existingDesc) {
+            existingDesc.remove();
+        }
+        
+        if (selectedValue && priorityDescriptions[selectedValue]) {
+            const description = document.createElement('small');
+            description.className = 'text-muted priority-description';
+            description.textContent = priorityDescriptions[selectedValue];
+            this.parentNode.appendChild(description);
+        }
+    });
+    
+    // Form validation enhancement
+    const form = document.querySelector('.needs-validation');
+    form.addEventListener('submit', function(event) {
+        const title = document.getElementById('title').value.trim();
+        const description = document.getElementById('description').value.trim();
+        
+        if (title.length < 5) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('title').setCustomValidity('Title must be at least 5 characters long');
+        } else {
+            document.getElementById('title').setCustomValidity('');
+        }
+        
+        if (description.length < 10) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('description').setCustomValidity('Description must be at least 10 characters long');
+        } else {
+            document.getElementById('description').setCustomValidity('');
+        }
+        
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}

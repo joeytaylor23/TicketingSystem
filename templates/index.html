@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - MedSupport System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="text-center mb-5">
+            <i class="fas fa-stethoscope fa-4x mb-3" style="color: #3498db;"></i>
+            <h1 class="display-4 mb-3" style="color: #ffffff;">MedSupport System</h1>
+            <p class="lead" style="color: #bdc3c7;">Professional Healthcare IT Support Management Platform</p>
+            <div class="mt-3">
+                <span class="badge bg-success me-2"><i class="fas fa-shield-alt me-1"></i>HIPAA Compliant</span>
+                <span class="badge bg-info me-2"><i class="fas fa-clock me-1"></i>24/7 Support</span>
+                <span class="badge bg-warning"><i class="fas fa-lock me-1"></i>Secure</span>
+            </div>
+        </div>
+
+        {% if not current_user.is_authenticated %}
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-sign-in-alt fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Login</h5>
+                        <p class="card-text">Access your existing account to view and manage tickets.</p>
+                        <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-user-plus fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Register</h5>
+                        <p class="card-text">Create a new account to start submitting support tickets.</p>
+                        <a href="{{ url_for('register') }}" class="btn btn-success">Register</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Demo Info Banner -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="alert alert-info d-flex align-items-center" role="alert">
+                    <i class="fas fa-info-circle fa-lg me-3"></i>
+                    <div class="flex-grow-1">
+                        <strong>Try the Demo!</strong> 
+                        <span class="d-none d-md-inline">This system includes pre-configured demo accounts for testing.</span>
+                        <span class="d-md-none">Demo accounts available for testing.</span>
+                    </div>
+                    <button type="button" class="btn btn-outline-info btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#demoInfoModal">
+                        <i class="fas fa-eye me-1"></i>View Demo Accounts
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row mt-5">
+            <div class="col-md-12">
+                <h3 class="text-center mb-4">Features</h3>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <i class="fas fa-user-md fa-2x text-info mb-3"></i>
+                                <h6 class="card-title">Medical Staff Roles</h6>
+                                <p class="card-text small">Doctor, IT Tech, and Staff roles with healthcare-appropriate permissions.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <i class="fas fa-tachometer-alt fa-2x text-warning mb-3"></i>
+                                <h6 class="card-title">Critical Priority System</h6>
+                                <p class="card-text small">Hospital-grade priority levels from routine to life-critical emergency.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <i class="fas fa-bell fa-2x text-danger mb-3"></i>
+                                <h6 class="card-title">Instant Alerts</h6>
+                                <p class="card-text small">Real-time notifications for critical system issues and updates.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-4 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="fas fa-clipboard-list fa-2x text-secondary mb-3"></i>
+                        <h6 class="card-title">Medical Audit Trail</h6>
+                        <p class="card-text small">HIPAA-compliant logging of all system activities and changes.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="fas fa-hospital fa-2x text-success mb-3"></i>
+                        <h6 class="card-title">Hospital-Ready</h6>
+                        <p class="card-text small">Designed for healthcare environments with 24/7 reliability.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="fas fa-user-shield fa-2x text-primary mb-3"></i>
+                        <h6 class="card-title">HIPAA Secure</h6>
+                        <p class="card-text small">Built with healthcare security standards and patient data protection.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Demo Info Modal -->
+<div class="modal fade" id="demoInfoModal" tabindex="-1" aria-labelledby="demoInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="demoInfoModalLabel">
+                    <i class="fas fa-play-circle me-2 text-success"></i>Demo Account Information
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success">
+                    <i class="fas fa-rocket me-2"></i>
+                    <strong>Welcome to the Demo!</strong> Explore the ticketing system with these pre-configured accounts, each showcasing different role capabilities.
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-crown me-2"></i>
+                                    <strong>Administrator</strong>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <strong>Username:</strong> <code>admin</code><br>
+                                    <strong>Password:</strong> <code>admin123</code>
+                                </div>
+                                <hr>
+                                <h6 class="text-danger">Full System Access:</h6>
+                                <ul class="small mb-0">
+                                    <li>User & role management</li>
+                                    <li>System configuration</li>
+                                    <li>View all tickets</li>
+                                    <li>Category management</li>
+                                    <li>System statistics</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-tools me-2"></i>
+                                    <strong>Technician</strong>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <strong>Username:</strong> <code>technician</code><br>
+                                    <strong>Password:</strong> <code>tech123</code>
+                                </div>
+                                <hr>
+                                <h6 class="text-primary">Ticket Management:</h6>
+                                <ul class="small mb-0">
+                                    <li>Assign tickets to self/others</li>
+                                    <li>Update status & priority</li>
+                                    <li>Resolve customer issues</li>
+                                    <li>Add technical comments</li>
+                                    <li>Track workload</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-user me-2"></i>
+                                    <strong>User</strong>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <strong>Username:</strong> <code>user</code><br>
+                                    <strong>Password:</strong> <code>user123</code>
+                                </div>
+                                <hr>
+                                <h6 class="text-success">Customer Experience:</h6>
+                                <ul class="small mb-0">
+                                    <li>Submit support tickets</li>
+                                    <li>Track ticket progress</li>
+                                    <li>Add comments/updates</li>
+                                    <li>View own ticket history</li>
+                                    <li>Receive notifications</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    <strong>Security Note:</strong> These are demonstration credentials only. In a production environment, always use strong, unique passwords and enable proper authentication measures.
+                </div>
+                
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6><i class="fas fa-lightbulb me-2 text-warning"></i>Suggested Demo Flow:</h6>
+                        <ol class="mb-0">
+                            <li><strong>Start as a User:</strong> Create a support ticket to understand the customer experience</li>
+                            <li><strong>Switch to Technician:</strong> Manage the ticket, update status, and add responses</li>
+                            <li><strong>Explore as Admin:</strong> View system overview, manage users, and configure settings</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="{{ url_for('login') }}" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt me-2"></i>Go to Login
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
