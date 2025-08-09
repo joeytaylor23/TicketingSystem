@@ -34,18 +34,17 @@
                 </div>
                 
                 <!-- SLA Info -->
-                {% set due_at = ticket.get_sla_due_at() %}
-                {% if due_at %}
+                {% if sla_due_at_iso %}
                 <div class="mb-4">
                     <h6 class="text-muted mb-2">SLA:</h6>
                     <div class="d-flex align-items-center">
-                        <span class="badge me-2 bg-{{ 'danger' if ticket.is_sla_breached() else 'secondary' }}">
-                            {{ 'Breached' if ticket.is_sla_breached() else 'Active' }}
+                        <span class="badge me-2 bg-{{ 'danger' if sla_breached else 'secondary' }}">
+                            {{ 'Breached' if sla_breached else 'Active' }}
                         </span>
                         <div>
-                            <div><strong>Due:</strong> <span id="slaDueAt" data-duets="{{ due_at.isoformat() }}">{{ due_at.strftime('%Y-%m-%d %H:%M') }} UTC</span></div>
+                            <div><strong>Due:</strong> <span id="slaDueAt" data-duets="{{ sla_due_at_iso }}">{{ sla_due_at_display }}</span></div>
                             <div class="small" id="slaCountdownContainer">
-                                <span id="slaCountdown" class="text-{{ 'danger' if ticket.is_sla_breached() else 'muted' }}"></span>
+                                <span id="slaCountdown" class="text-{{ 'danger' if sla_breached else 'muted' }}"></span>
                             </div>
                         </div>
                     </div>

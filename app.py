@@ -351,27 +351,51 @@ def create_ticket():
 @app.route('/ticket/<int:ticket_id>')
 @login_required
 def view_ticket(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    
-    # Check permissions
-    if not current_user.is_technician() and ticket.created_by_id != current_user.id:
-        flash('You do not have permission to view this ticket.')
-        return redirect(url_for('dashboard'))
-    
-    activity_logs = ticket.activity_logs.order_by(ActivityLog.timestamp.desc()).all()
-    # SLA check on view
-    check_and_handle_sla(ticket)
-    # Attachments
-    attachments = ticket.attachments.order_by(Attachment.uploaded_at.desc()).all()
-    technicians = User.query.filter(User.role.in_(['admin', 'technician'])).all()
-    categories = Category.query.all()
-    
-    return render_template('view_ticket.html', 
-                         ticket=ticket, 
-                         activity_logs=activity_logs,
-                         technicians=technicians,
-                         categories=categories,
-                         attachments=attachments)
+    try:
+        ticket = Ticket.query.get_or_404(ticket_id)
+
+        # Check permissions
+        if not current_user.is_technician() and ticket.created_by_id != current_user.id:
+            flash('You do not have permission to view this ticket.')
+            return redirect(url_for('dashboard'))
+
+        activity_logs = ticket.activity_logs.order_by(ActivityLog.timestamp.desc()).all()
+
+        # SLA pre-compute and check (guarded)
+        sla_due_at_iso = None
+        sla_due_at_display = None
+        sla_breached = False
+        try:
+            check_and_handle_sla(ticket)
+            due = ticket.get_sla_due_at()
+            if due:
+                sla_due_at_iso = due.isoformat()
+                sla_due_at_display = due.strftime('%Y-%m-%d %H:%M') + ' UTC'
+                sla_breached = ticket.is_sla_breached()
+        except Exception as e:
+            print(f"SLA check failed for ticket {ticket_id}: {e}")
+
+        # Attachments (guarded)
+        try:
+            attachments = ticket.attachments.order_by(Attachment.uploaded_at.desc()).all()
+        except Exception as e:
+            print(f"Attachments fetch failed for ticket {ticket_id}: {e}")
+            attachments = []
+
+        technicians = User.query.filter(User.role.in_(['admin', 'technician'])).all()
+        categories = Category.query.all()
+
+        return render_template('view_ticket.html',
+                               ticket=ticket,
+                               activity_logs=activity_logs,
+                               technicians=technicians,
+                               categories=categories,
+                               attachments=attachments,
+                               sla_due_at_iso=sla_due_at_iso,
+                               sla_due_at_display=sla_due_at_display,
+                               sla_breached=sla_breached)
+    except Exception:
+        raise
 
 @app.route('/update_ticket/<int:ticket_id>', methods=['POST'])
 @login_required
@@ -1030,4 +1054,4 @@ if __name__ == '__main__':
         init_db()
     # Production settings
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
