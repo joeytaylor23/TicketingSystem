@@ -110,6 +110,73 @@
                         </div>
                     </div>
                 </div>
+
+                <hr>
+                <!-- Charts -->
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="fas fa-stream me-2"></i>Tickets by Priority</div>
+                            <div class="card-body">
+                                <canvas id="priorityChart" height="160"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="fas fa-tasks me-2"></i>Tickets by Status</div>
+                            <div class="card-body">
+                                <canvas id="statusChart" height="160"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12 mb-4">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-chart-line me-2"></i>Ticket Volume</span>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-secondary" onclick="loadAnalytics('week')">Last 7 days</button>
+                                    <button class="btn btn-outline-secondary" onclick="loadAnalytics('month')">Last 30 days</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="volumeChart" height="80"></canvas>
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted">Avg Resolution Time (hrs)</h6>
+                                        <canvas id="resolutionChart" height="120"></canvas>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted">SLA Breaches</h6>
+                                        <canvas id="slaChart" height="120"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="fas fa-folder-open me-2"></i>Tickets by Category</div>
+                            <div class="card-body">
+                                <canvas id="categoryChart" height="160"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="fas fa-user-cog me-2"></i>Technician Performance</div>
+                            <div class="card-body">
+                                <canvas id="techChart" height="160"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -746,5 +813,121 @@ function showAlert(message, type) {
 function printReport() {
     window.print();
 }
+</script>
+<script id="priorityCountsData" type="application/json">{{ priority_counts|tojson }}</script>
+<script id="statusCountsData" type="application/json">{{ status_counts|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const priorityCtx = document.getElementById('priorityChart');
+        const statusCtx = document.getElementById('statusChart');
+        if (priorityCtx && statusCtx && window.Chart) {
+            const priorityCounts = JSON.parse(document.getElementById('priorityCountsData').textContent);
+            const statusCounts = JSON.parse(document.getElementById('statusCountsData').textContent);
+            const priorityData = {
+                labels: ['Urgent', 'High', 'Medium', 'Low'],
+                datasets: [{
+                    label: 'Tickets',
+                    data: [priorityCounts.urgent, priorityCounts.high, priorityCounts.medium, priorityCounts.low],
+                    backgroundColor: ['#dc3545','#fd7e14','#0dcaf0','#6c757d']
+                }]
+            };
+            new Chart(priorityCtx, { type: 'doughnut', data: priorityData, options: { responsive: true } });
+
+            const statusData = {
+                labels: ['Open', 'In Progress', 'Resolved', 'Closed'],
+                datasets: [{
+                    label: 'Tickets',
+                    data: [statusCounts.open, statusCounts.in_progress, statusCounts.resolved, statusCounts.closed],
+                    backgroundColor: ['#0d6efd','#20c997','#198754','#6c757d']
+                }]
+            };
+            new Chart(statusCtx, { type: 'bar', data: statusData, options: { responsive: true, plugins: { legend: { display: false } } } });
+        }
+    } catch (e) { console.error('Chart init error', e); }
+});
+</script>
+<script>
+// Dynamic analytics charts for volume, category, and technician performance
+let volumeChartRef = null;
+let categoryChartRef = null;
+let techChartRef = null;
+
+function loadAnalytics(range) {
+    fetch(`/admin/analytics?range=${encodeURIComponent(range)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+            showAlert('Analytics error: ' + data.error, 'danger');
+            return;
+        }
+        const volCtx = document.getElementById('volumeChart');
+        if (volCtx && window.Chart) {
+            if (volumeChartRef) volumeChartRef.destroy();
+            volumeChartRef = new Chart(volCtx, {
+                type: 'line',
+                data: {
+                    labels: data.volume_by_day.labels,
+                    datasets: [{ label: 'Tickets', data: data.volume_by_day.counts, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.2)', fill: true }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+        const resCtx = document.getElementById('resolutionChart');
+        if (resCtx && window.Chart) {
+            if (window.resolutionChartRef) window.resolutionChartRef.destroy();
+            window.resolutionChartRef = new Chart(resCtx, {
+                type: 'line',
+                data: {
+                    labels: data.resolution_trend.labels,
+                    datasets: [{ label: 'Avg Hours', data: data.resolution_trend.avg_hours, borderColor: '#20c997', backgroundColor: 'rgba(32,201,151,0.2)', fill: true }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+        const slaCtx = document.getElementById('slaChart');
+        if (slaCtx && window.Chart) {
+            if (window.slaChartRef) window.slaChartRef.destroy();
+            window.slaChartRef = new Chart(slaCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.sla_breaches_by_day.labels,
+                    datasets: [{ label: 'Breaches', data: data.sla_breaches_by_day.counts, backgroundColor: '#dc3545' }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+        const catCtx = document.getElementById('categoryChart');
+        if (catCtx && window.Chart) {
+            if (categoryChartRef) categoryChartRef.destroy();
+            categoryChartRef = new Chart(catCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.category_counts.map(c => c.name),
+                    datasets: [{ data: data.category_counts.map(c => c.count), backgroundColor: ['#0dcaf0','#6f42c1','#20c997','#ffc107','#dc3545','#6c757d'] }]
+                },
+                options: { responsive: true }
+            });
+        }
+        const techCtx = document.getElementById('techChart');
+        if (techCtx && window.Chart) {
+            if (techChartRef) techChartRef.destroy();
+            techChartRef = new Chart(techCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.technician_performance.map(t => t.username),
+                    datasets: [{ label: 'Closed', data: data.technician_performance.map(t => t.closed_count), backgroundColor: '#198754' }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+      })
+      .catch(err => showAlert('Failed to load analytics: ' + err.message, 'danger'));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAnalytics('week');
+});
 </script>
 {% endblock %}

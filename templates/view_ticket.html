@@ -33,6 +33,25 @@
                     <p class="mb-0">{{ ticket.description }}</p>
                 </div>
                 
+                <!-- SLA Info -->
+                {% set due_at = ticket.get_sla_due_at() %}
+                {% if due_at %}
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">SLA:</h6>
+                    <div class="d-flex align-items-center">
+                        <span class="badge me-2 bg-{{ 'danger' if ticket.is_sla_breached() else 'secondary' }}">
+                            {{ 'Breached' if ticket.is_sla_breached() else 'Active' }}
+                        </span>
+                        <div>
+                            <div><strong>Due:</strong> <span id="slaDueAt" data-duets="{{ due_at.isoformat() }}">{{ due_at.strftime('%Y-%m-%d %H:%M') }} UTC</span></div>
+                            <div class="small" id="slaCountdownContainer">
+                                <span id="slaCountdown" class="text-{{ 'danger' if ticket.is_sla_breached() else 'muted' }}"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="row text-muted small">
                     <div class="col-md-6">
                         <strong>Created by:</strong> {{ ticket.creator.username }}<br>
@@ -140,6 +159,41 @@
         </div>
         {% endif %}
         
+        <!-- Attachments -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-paperclip me-2"></i>Attachments</h6>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('upload_attachment', ticket_id=ticket.id) }}" method="post" enctype="multipart/form-data" class="mb-3">
+                    <div class="input-group">
+                        <input type="file" name="file" class="form-control" accept=".png,.jpg,.jpeg,.gif,.pdf,.txt,.log" required>
+                        <button class="btn btn-primary" type="submit"><i class="fas fa-upload me-1"></i>Upload</button>
+                    </div>
+                    <div class="form-text">Allowed: png, jpg, jpeg, gif, pdf, txt, log (max 16MB)</div>
+                </form>
+
+                {% if attachments %}
+                <ul class="list-group">
+                    {% for att in attachments %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="far fa-file me-2"></i>
+                            <a href="{{ url_for('download_attachment', attachment_id=att.id) }}">{{ att.filename }}</a>
+                            <small class="text-muted ms-2">{{ (att.size_bytes / (1024*1024))|round(2) }} MB • {{ att.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                        <form action="{{ url_for('delete_attachment', attachment_id=att.id) }}" method="post" onsubmit="return confirm('Delete this attachment?');">
+                            <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted mb-0">No attachments yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Activity Log -->
         <div class="card">
             <div class="card-header">
@@ -228,6 +282,41 @@ document.addEventListener('DOMContentLoaded', function() {
         commentTextarea.addEventListener('input', updateCounter);
         updateCounter();
     }
+
+    // SLA countdown
+    (function() {
+        const el = document.getElementById('slaCountdown');
+        const dueEl = document.getElementById('slaDueAt');
+        if (!el || !dueEl) return;
+        const iso = dueEl.getAttribute('data-duets');
+        if (!iso) return;
+        const due = new Date(iso);
+        function fmt(seconds) {
+            const s = Math.max(Math.floor(seconds), 0);
+            const d = Math.floor(s / 86400);
+            const h = Math.floor((s % 86400) / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            const parts = [];
+            if (d) parts.push(d + 'd');
+            parts.push(h.toString().padStart(2,'0') + 'h');
+            parts.push(m.toString().padStart(2,'0') + 'm');
+            parts.push(sec.toString().padStart(2,'0') + 's');
+            return parts.join(' ');
+        }
+        function tick() {
+            const now = new Date();
+            const remaining = (due - now) / 1000;
+            if (remaining <= 0) {
+                el.textContent = 'SLA breached';
+                el.classList.add('text-danger');
+                return; // stop updating
+            }
+            el.textContent = 'Time remaining: ' + fmt(remaining);
+            setTimeout(tick, 1000);
+        }
+        tick();
+    })();
 });
 </script>
 {% endblock %}

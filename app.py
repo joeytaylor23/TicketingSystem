@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_mail import Mail, Message
@@ -14,6 +14,11 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ticketing_system.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(__file__), 'uploads'))
+app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH_MB', 16)) * 1024 * 1024  # 16 MB default
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Email configuration
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -85,6 +90,37 @@ class Ticket(db.Model):
     # Relationships
     activity_logs = db.relationship('ActivityLog', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
 
+    # --- SLA helpers ---
+    def get_sla_hours(self):
+        priority_to_hours = {
+            'low': 72,
+            'medium': 48,
+            'high': 24,
+            'urgent': 8,
+        }
+        return priority_to_hours.get(self.priority, 48)
+
+    def get_sla_due_at(self):
+        return self.created_at + timedelta(hours=self.get_sla_hours()) if self.created_at else None
+
+    def is_sla_active(self):
+        return self.status in ['open', 'in_progress']
+
+    def is_sla_breached(self):
+        due = self.get_sla_due_at()
+        if not due:
+            return False
+        if not self.is_sla_active():
+            return False
+        return datetime.now(timezone.utc) > due
+
+    def get_sla_remaining_seconds(self):
+        due = self.get_sla_due_at()
+        if not due:
+            return 0
+        remaining = (due - datetime.now(timezone.utc)).total_seconds()
+        return int(remaining)
+
 class ActivityLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     action = db.Column(db.String(100), nullable=False)
@@ -97,6 +133,22 @@ class ActivityLog(db.Model):
     
     # Relationships
     user = db.relationship('User', backref='activity_logs')
+
+class Attachment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    stored_path = db.Column(db.String(500), nullable=False)
+    content_type = db.Column(db.String(100))
+    size_bytes = db.Column(db.Integer)
+    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Foreign Keys
+    ticket_id = db.Column(db.Integer, db.ForeignKey('ticket.id'), nullable=False)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    # Relationships
+    ticket = db.relationship('Ticket', backref=db.backref('attachments', lazy='dynamic', cascade='all, delete-orphan'))
+    uploaded_by = db.relationship('User')
 
 # Utility functions
 def send_notification_email(to_email, subject, body):
@@ -124,6 +176,39 @@ def log_activity(ticket_id, action, description, user_id=None):
         )
         db.session.add(activity)
         db.session.commit()
+
+def allowed_file(filename: str) -> bool:
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'txt', 'log'}
+    if '.' not in filename:
+        return False
+    ext = filename.rsplit('.', 1)[1].lower()
+    return ext in allowed_extensions
+
+def check_and_handle_sla(ticket: 'Ticket') -> None:
+    """If SLA is breached for this ticket, log once and notify admins/assignee."""
+    try:
+        if not ticket.is_sla_breached():
+            return
+        # Has this ticket already been escalated?
+        already = ActivityLog.query.filter_by(ticket_id=ticket.id, action='SLA Escalated').first()
+        if already:
+            return
+        # Log escalation
+        log_activity(ticket.id, 'SLA Escalated', f'SLA breached for ticket {ticket.id}. Escalating.')
+        # Notify admins and assigned technician
+        recipients = []
+        admins = User.query.filter_by(role='admin').all()
+        recipients.extend([a.email for a in admins])
+        if ticket.assignee:
+            recipients.append(ticket.assignee.email)
+        for email in set([r for r in recipients if r]):
+            send_notification_email(
+                email,
+                f'SLA Breached: Ticket #{ticket.id} - {ticket.title}',
+                'The SLA for this ticket has been breached. Please take immediate action.'
+            )
+    except Exception as e:
+        print(f"SLA check error for ticket {ticket.id}: {e}")
 
 # Routes
 @app.route('/')
@@ -207,6 +292,14 @@ def dashboard():
     open_tickets = len([t for t in tickets if t.status in ['open', 'in_progress']])
     closed_tickets = len([t for t in tickets if t.status in ['resolved', 'closed']])
     
+    # Run SLA checks for visible tickets
+    try:
+        for t in tickets:
+            if t.is_sla_active():
+                check_and_handle_sla(t)
+    except Exception as e:
+        print(f"SLA dashboard check error: {e}")
+
     return render_template('dashboard.html', 
                          tickets=tickets, 
                          total_tickets=total_tickets,
@@ -266,6 +359,10 @@ def view_ticket(ticket_id):
         return redirect(url_for('dashboard'))
     
     activity_logs = ticket.activity_logs.order_by(ActivityLog.timestamp.desc()).all()
+    # SLA check on view
+    check_and_handle_sla(ticket)
+    # Attachments
+    attachments = ticket.attachments.order_by(Attachment.uploaded_at.desc()).all()
     technicians = User.query.filter(User.role.in_(['admin', 'technician'])).all()
     categories = Category.query.all()
     
@@ -273,7 +370,8 @@ def view_ticket(ticket_id):
                          ticket=ticket, 
                          activity_logs=activity_logs,
                          technicians=technicians,
-                         categories=categories)
+                         categories=categories,
+                         attachments=attachments)
 
 @app.route('/update_ticket/<int:ticket_id>', methods=['POST'])
 @login_required
@@ -348,6 +446,89 @@ def update_ticket(ticket_id):
     flash('Ticket updated successfully!')
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
+@app.route('/ticket/<int:ticket_id>/upload', methods=['POST'])
+@login_required
+def upload_attachment(ticket_id):
+    ticket = Ticket.query.get_or_404(ticket_id)
+
+    # Permission check
+    if not current_user.is_technician() and ticket.created_by_id != current_user.id:
+        flash('You do not have permission to upload to this ticket.')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+    if 'file' not in request.files:
+        flash('No file part')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash('No selected file')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+    if file and allowed_file(file.filename):
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(file.filename)
+        # Prefix with ticket and timestamp for uniqueness
+        ts = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
+        stored_name = f"t{ticket.id}_{ts}_{safe_name}"
+        stored_path = os.path.join(app.config['UPLOAD_FOLDER'], stored_name)
+        file.save(stored_path)
+
+        att = Attachment(
+            filename=safe_name,
+            stored_path=stored_path,
+            content_type=file.mimetype,
+            size_bytes=os.path.getsize(stored_path),
+            ticket_id=ticket.id,
+            uploaded_by_id=current_user.id,
+        )
+        db.session.add(att)
+        db.session.commit()
+
+        log_activity(ticket.id, 'Attachment Uploaded', f'{current_user.username} uploaded {safe_name}')
+        flash('File uploaded successfully.')
+    else:
+        flash('Invalid file type. Allowed: png, jpg, jpeg, gif, pdf, txt, log')
+
+    return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+@app.route('/attachments/<int:attachment_id>/download')
+@login_required
+def download_attachment(attachment_id):
+    att = Attachment.query.get_or_404(attachment_id)
+
+    # Permission check: ticket creator or technician
+    if not current_user.is_technician() and att.ticket.created_by_id != current_user.id:
+        flash('You do not have permission to download this file.')
+        return redirect(url_for('dashboard'))
+
+    directory = os.path.dirname(att.stored_path)
+    filename = os.path.basename(att.stored_path)
+    return send_from_directory(directory, filename, as_attachment=True, download_name=att.filename)
+
+@app.route('/attachments/<int:attachment_id>/delete', methods=['POST'])
+@login_required
+def delete_attachment(attachment_id):
+    att = Attachment.query.get_or_404(attachment_id)
+    ticket = att.ticket
+
+    # Permission: technician/admin or ticket owner
+    if not current_user.is_technician() and ticket.created_by_id != current_user.id:
+        flash('You do not have permission to delete this file.')
+        return redirect(url_for('view_ticket', ticket_id=ticket.id))
+
+    try:
+        if os.path.exists(att.stored_path):
+            os.remove(att.stored_path)
+    except Exception as e:
+        print(f"Failed to remove file: {e}")
+
+    db.session.delete(att)
+    db.session.commit()
+    log_activity(ticket.id, 'Attachment Deleted', f'{current_user.username} deleted {att.filename}')
+    flash('Attachment deleted.')
+    return redirect(url_for('view_ticket', ticket_id=ticket.id))
+
 @app.route('/add_comment/<int:ticket_id>', methods=['POST'])
 @login_required
 def add_comment(ticket_id):
@@ -390,7 +571,129 @@ def admin_panel():
     
     users = User.query.all()
     categories = Category.query.all()
-    return render_template('admin.html', users=users, categories=categories)
+
+    # Basic analytics for charts (JSON endpoints also available if needed)
+    priority_counts = {
+        'urgent': Ticket.query.filter_by(priority='urgent').count(),
+        'high': Ticket.query.filter_by(priority='high').count(),
+        'medium': Ticket.query.filter_by(priority='medium').count(),
+        'low': Ticket.query.filter_by(priority='low').count(),
+    }
+    status_counts = {
+        'open': Ticket.query.filter_by(status='open').count(),
+        'in_progress': Ticket.query.filter_by(status='in_progress').count(),
+        'resolved': Ticket.query.filter_by(status='resolved').count(),
+        'closed': Ticket.query.filter_by(status='closed').count(),
+    }
+    return render_template('admin.html', users=users, categories=categories, priority_counts=priority_counts, status_counts=status_counts)
+
+@app.route('/admin/analytics')
+@login_required
+def admin_analytics():
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        range_param = request.args.get('range', 'week')
+        days = 7 if range_param == 'week' else 30
+        start_at = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # Ticket volume by day
+        tickets_in_range = Ticket.query.filter(Ticket.created_at >= start_at).all()
+        by_day = {}
+        for t in tickets_in_range:
+            day_str = t.created_at.date().isoformat()
+            by_day[day_str] = by_day.get(day_str, 0) + 1
+        # Fill missing days
+        labels = []
+        counts = []
+        for i in range(days, -1, -1):
+            d = (datetime.now(timezone.utc) - timedelta(days=i)).date().isoformat()
+            labels.append(d)
+            counts.append(by_day.get(d, 0))
+
+        # Category counts in range
+        category_stats = []
+        for c in Category.query.all():
+            count = Ticket.query.filter(Ticket.category_id == c.id, Ticket.created_at >= start_at).count()
+            category_stats.append({'name': c.name, 'count': count})
+
+        # Avg resolution time (tickets resolved/closed in range by update time)
+        done = Ticket.query.filter(Ticket.status.in_(['resolved', 'closed']), Ticket.updated_at >= start_at).all()
+        avg_resolution_hours = 0
+        res_by_day_sum = {}
+        res_by_day_count = {}
+        if done:
+            total_hours = 0
+            for t in done:
+                hours = max(0, (t.updated_at - t.created_at).total_seconds()) / 3600
+                total_hours += hours
+                day_key = t.updated_at.date().isoformat()
+                res_by_day_sum[day_key] = res_by_day_sum.get(day_key, 0) + hours
+                res_by_day_count[day_key] = res_by_day_count.get(day_key, 0) + 1
+            avg_resolution_hours = total_hours / len(done)
+
+        # Technician performance (tickets resolved/closed in range)
+        tech_perf = {}
+        for t in done:
+            tech_id = t.assigned_to_id
+            if tech_id is None:
+                continue
+            if tech_id not in tech_perf:
+                u = User.query.get(tech_id)
+                tech_perf[tech_id] = {
+                    'user_id': tech_id,
+                    'username': (u.username if u else f'User {tech_id}'),
+                    'closed_count': 0,
+                    'total_hours': 0.0,
+                }
+            tech_perf[tech_id]['closed_count'] += 1
+            tech_perf[tech_id]['total_hours'] += max(0, (t.updated_at - t.created_at).total_seconds()) / 3600
+
+        tech_list = []
+        for v in tech_perf.values():
+            avg_h = v['total_hours'] / v['closed_count'] if v['closed_count'] else 0
+            tech_list.append({
+                'username': v['username'],
+                'closed_count': v['closed_count'],
+                'avg_resolution_hours': avg_h,
+            })
+
+        # SLA breaches by day (based on ActivityLog 'SLA Escalated')
+        sla_logs = ActivityLog.query.filter(
+            ActivityLog.action == 'SLA Escalated',
+            ActivityLog.timestamp >= start_at
+        ).all()
+        sla_by_day = {}
+        for log in sla_logs:
+            day_key = log.timestamp.date().isoformat()
+            sla_by_day[day_key] = sla_by_day.get(day_key, 0) + 1
+
+        # Build aligned day labels for trend series
+        trend_labels = []
+        res_avg_series = []
+        sla_counts_series = []
+        for i in range(days, -1, -1):
+            day = (datetime.now(timezone.utc) - timedelta(days=i)).date().isoformat()
+            trend_labels.append(day)
+            # average resolution hours that day
+            if res_by_day_count.get(day, 0) > 0:
+                res_avg_series.append(round(res_by_day_sum.get(day, 0) / res_by_day_count.get(day, 1), 2))
+            else:
+                res_avg_series.append(0)
+            sla_counts_series.append(sla_by_day.get(day, 0))
+
+        return jsonify({
+            'range': range_param,
+            'volume_by_day': { 'labels': labels, 'counts': counts },
+            'category_counts': category_stats,
+            'avg_resolution_hours': round(avg_resolution_hours, 2),
+            'technician_performance': tech_list,
+            'resolution_trend': { 'labels': trend_labels, 'avg_hours': res_avg_series },
+            'sla_breaches_by_day': { 'labels': trend_labels, 'counts': sla_counts_series },
+        })
+    except Exception as e:
+        return jsonify({'error': f'Analytics failed: {str(e)}'}), 500
 
 @app.route('/admin/create_category', methods=['POST'])
 @login_required
@@ -534,6 +837,9 @@ def generate_report():
                 'open_tickets': open_tickets,
                 'closed_tickets': closed_tickets,
                 'avg_resolution_hours': round(avg_resolution_hours, 2)
+            },
+            'weekly': {
+                'new_tickets': Ticket.query.filter(Ticket.created_at >= week_ago).count(),
             },
             'priority_breakdown': {
                 'urgent': urgent_tickets,
